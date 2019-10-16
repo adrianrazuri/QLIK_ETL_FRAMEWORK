@@ -1,0 +1,767 @@
+/********************************************************************/
+//CREADO POR: ADRIAN RAZURI
+//COMPATIBILIDAD : QLIKVIEW - QLIK SENSE
+//FECHA CREACION : 11/2014
+//FECHA ULTIMA REVISION : 03/2019
+/********************************************************************/
+
+SUB INIT(CN,CNLIB,CNLIB_TRA)
+
+	SET ThousandSep=',';
+    SET DecimalSep='.';
+    SET MoneyThousandSep=',';
+    SET MoneyDecimalSep='.';
+    SET MoneyFormat='S/#,##0.00;-S/#,##0.00';
+    SET TimeFormat='hh:mm:ss';
+    SET DateFormat='D/MM/YYYY';
+    SET TimestampFormat='D/MM/YYYY hh:mm:ss[.fff]';
+    SET FirstWeekDay=6;
+    SET BrokenWeeks=1;
+    SET ReferenceDay=0;
+    SET FirstMonthOfYear=1;
+    SET CollationLocale='es-PE';
+    SET CreateSearchIndexOnReload=1;
+    SET MonthNames='ene.;feb.;mar.;abr.;may.;jun.;jul.;ago.;set.;oct.;nov.;dic.';
+    SET LongMonthNames='Enero;Febrero;Marzo;Abril;Mayo;Junio;Julio;Agosto;Setiembre;Octubre;Noviembre;Diciembre';
+    SET DayNames='lun.;mar.;mié.;jue.;vie.;sáb.;dom.';
+    SET LongDayNames='lunes;martes;miércoles;jueves;viernes;sábado;domingo';
+    
+    LET StrConexion = '$(CN)';
+
+ 	LET RUTAORA_QVD_EXTRACCION = '$(CNLIB)';
+	
+	LET RUTAORA_QVD_TRANSFORMACION = '$(CNLIB_TRA)';
+    
+// 	SET RUTAORA_QVD_EXTRACCION = '..\4.QVD\1.Extraccion\ORACLE\';
+// 	SET RUTA_QVD_PREPARADO = '..\4.QVD\2.Transformacion\';
+// 	SET RUTA_QVD_TEMPORALES = '..\4.QVD\3.Temporales\';
+// 	SET RUTA_QVD_CONFIGURACIONES = '..\4.QVD\4.Configuraciones\';
+// 	SET RUTA_PLANOS = '..\5.Planos\';
+// 	SET RUTA_QVD_ODS = '..\4.QVD\4.ODS\'; 
+	
+	
+	TRACE ESTABLECIENDO VARIABLES DE CONFIGURACION...;
+	
+	/*AGREGADO POR ADRIAN PARA EMPAQUETAR EL CODIGO DE RECARGA DE TODAS LAS APLICACIONES 11-01-2016*/ 
+	
+	LET v_HORASTOP= Hour(LocalTime());
+	LET v_MINUTOSTOP= Minute(LocalTime());
+	LET v_NombreDia = WeekDay(NOW());
+	
+    
+    Let vFrom = DATE(AddMonths(Today(),-12), 'YYYYMM');
+    Let vTo = Date(Today(), 'YYYYMM');
+    
+	//6 meses antes 30/04/18 agregado por ADRIAN RAZURI
+	//LET v_ANIOINICIAL = year(AddMonths(now(),-6));
+	//LET v_MES_INICIAL = date(AddMonths(now(),-6),'MM');
+    
+    LET v_DIA_INICIAL = date(AddMonths(now(),-6),'DD');
+    
+    Let vFrom = DATE(AddMonths(Today(),-6), 'YYYYMM');
+    Let vTo = Date(Today(), 'YYYYMM');
+    
+
+	//COMENTADO PRO ADRIAN RAZURI 30/04/18
+	/* let v_ANIOINICIAL = 2015;
+	let v_MES_INICIAL = 01;*/
+	
+	//fecha anctual 30/04/18 ADRIAN RAZURI
+	LET v_ANIOLIMITE = year(now());
+	LET v_MES_LIMITE = DATE(now(),'MM');
+    
+    LET v_DIA_LIMITE = DATE(now(),'DD');
+	
+	/* LET v_ANIOLIMITE = year(AddMonths(now(),-1));
+	LET v_MES_LIMITE = date(AddMonths(now(),-1),'MM');*/
+	
+   
+END SUB;
+
+
+/*********************************************************************************************/
+//FUNCION QUE ESTABLECE LOS PERIODOS DE RECARGA EN FUNCION A LA HORA DE EJECUCION
+SUB RELOAD_DATA(P_ANIOINICIAL,P_MES_INICIAL,P_ANIOLIMITE,P_MES_LIMITE)
+
+
+	//ANTES DE USAR ESTA FUNCION SE DEBEN ESTABLECER LAS VARIABLES DE LA FUNCION INIT
+	IF  NOT ISNULL(P_ANIOINICIAL) AND ISNUM(P_ANIOINICIAL) THEN 
+		LET v_ANIOINICIAL = P_ANIOINICIAL; 
+	ENDIF;
+	IF  NOT ISNULL(P_MES_INICIAL) AND ISNUM(P_MES_INICIAL) THEN 
+		LET v_MES_INICIAL = P_MES_INICIAL;
+	ENDIF;
+	IF NOT ISNULL(P_ANIOLIMITE) AND ISNUM(P_ANIOLIMITE) THEN 
+		LET v_ANIOLIMITE = P_ANIOLIMITE;
+	ENDIF;
+	IF NOT ISNULL(P_MES_LIMITE) AND ISNUM(P_MES_LIMITE) THEN 
+		LET v_MES_LIMITE = P_MES_LIMITE;
+	ENDIF;
+	
+	//TRACE $(v_ANIOINICIAL) $(v_MES_INICIAL) $(v_ANIOLIMITE) $(v_MES_LIMITE);
+	
+	
+	IF MATCH(v_HORASTOP,22 ,23,24 ) THEN
+    	TRACE LOS PROCESOS EN HORA $(v_HORASTOP) NO ESTAN PERMITIDOS;
+		EXIT Script
+	
+	ELSEIF MATCH(v_HORASTOP, 0,1, 2,3) THEN
+    
+
+		//RECARGA FULL 
+        LIB CONNECT TO '$(StrConexion)';
+		
+ 		let v_ANIOINICIAL = 2016;
+		let v_MES_INICIAL = 12;
+	
+		LET v_ANIOLIMITE = year(now());
+		LET v_MES_LIMITE = DATE(now(),'MM');  
+        
+        TRACE INICIANDO PROCESO DE RECARGA FULL DESDE $(v_ANIOINICIAL) - $(v_MES_INICIAL);
+        
+        
+    ELSEIF MATCH(v_HORASTOP,5,12) THEN
+    
+		//RECARGA 1 MESES 
+        LIB CONNECT TO '$(StrConexion)';
+		
+ 		let v_ANIOINICIAL = year(AddMonths(now(),-1));
+		let v_MES_INICIAL = DATE(AddMonths(now(),-1),'MM'); 
+	
+		LET v_ANIOLIMITE = year(now());
+		LET v_MES_LIMITE = DATE(now(),'MM');  
+        
+        TRACE INICIANDO PROCESO DE RECARGA 6 MESES DESDE $(v_ANIOINICIAL) - $(v_MES_INICIAL);
+        
+    ELSEIF MATCH(v_HORASTOP,8,9,10,11,13,14,15,16,17,18,19,20,21) THEN
+    	
+        
+    	
+		IF(P_ANIOINICIAL = '' OR P_MES_INICIAL = '' OR P_ANIOLIMITE = '' OR P_MES_LIMITE='') THEN 
+
+               //TRACE RECARGA DE 1 MES;		
+
+        	   LIB CONNECT TO '$(StrConexion)';
+		
+ 		   let v_ANIOINICIAL = year(AddMonths(now(),0));
+		   let v_MES_INICIAL = DATE(AddMonths(now(),0),'MM'); 
+	
+		   LET v_ANIOLIMITE = year(now());
+		   LET v_MES_LIMITE = DATE(now(),'MM');  
+
+		ELSE
+			LIB CONNECT TO '$(StrConexion)';
+			TRACE RECARGA POR PARAMETROS;
+
+		ENDIF;
+        
+        TRACE VARIABLES ESTABLECIDAS PARA PROCESO DE RECARGA 1 MES DESDE $(v_ANIOINICIAL) - $(v_MES_INICIAL);    
+       
+
+	ELSE
+		
+		TRACE HORA NO PERMITIDA;
+		EXIT Script;
+	ENDIF;
+
+
+END SUB
+/*********************************************************************************************/
+
+
+/****************************************************************************************/
+//FUNCIONES PARA PARGA DE RUTAS
+
+SUB GET_DATAMART(V_PREFIJO,V_TABLA)
+
+	V_PREFIJO = '[lib://$(RUTA_QVD_PREPARADO)/$(V_TABLA).qvd](qvd)';
+
+END Sub;
+
+SUB GET_QVD(V_PREFIJO,V_TABLA)
+	
+	TRACE $(RUTAORA_QVD_EXTRACCION);
+	
+	V_PREFIJO = '[lib://$(RUTAORA_QVD_EXTRACCION)/$(V_TABLA).qvd](qvd)';
+ 
+END Sub;
+
+
+SUB GET_EXCEL(V_PREFIJO,V_TABLA)
+
+	V_PREFIJO = '[$(RUTA_PLANOS)$(V_TABLA).xlsx](ooxml, embedded labels, table is Hoja1)';
+ 
+END Sub;
+/***********************************************************************************/
+
+/***********************************************************************************/
+//FUNCION QUE GENERA REGISTROS CON DATOS DE ULTIMA CARGA
+SUB GENERATE_TIMEFILE(V_REPORTE_NAME)
+
+	IF FileTime('[lib://$(RUTAORA_QVD_EXTRACCION)/RELOAD_APP.qvd]') > 0 THEN
+		
+		TRACE ACTUALIZANDO TIEMPO DE ACTUALIZACION DEL QVD $(V_REPORTE_NAME);
+		TIEMPO_RECARGA:
+			LOAD REPORTE,
+				 ULTIMA_CARGA 
+			FROM [lib://$(RUTAORA_QVD_EXTRACCION)/RELOAD_APP.qvd](qvd) 
+			WHERE REPORTE <> '$(V_REPORTE_NAME)'; 
+
+		CONCATENATE(TIEMPO_RECARGA)
+			LOAD '$(V_REPORTE_NAME)' AS REPORTE,
+				 TIMESTAMP(NOW()) AS ULTIMA_CARGA 
+			AutoGenerate 1;
+	
+	ELSE
+		TRACE QVD DE RECARGAS NO ENCONTRADO, SE PROCEDE A CREARLO;
+		TIEMPO_RECARGA:
+			LOAD '$(V_REPORTE_NAME)' AS REPORTE,
+				 TIMESTAMP(NOW()) AS ULTIMA_CARGA 
+			AutoGenerate 1;
+	
+	ENDIF;
+
+	STORE TIEMPO_RECARGA INTO [lib://$(RUTAORA_QVD_EXTRACCION)/RELOAD_APP.qvd](qvd);
+	DROP Table TIEMPO_RECARGA; 
+
+END SUB;
+/***********************************************************************************/
+
+
+/*SCRIPT QUE CONTIENE FUNCIONES QUE SON UTILIZADAS EN LA CAPA MODELO PARA ACCESO A DATOS */
+/*ANTES DE SER USADO DEBEN HABER SIDO IMPORTADA LA LIBRERIA DE CONEXION*/
+
+/********************************************************************************************/
+//SCRIPT QUE GENERA EL QVD
+
+SUB GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_ANIOMES_CONDICION,V_TIPO_PERIODO,V_CONDICIONES,V_GROUPBY,V_TIPOCAMPOBUSQUEDA,V_CAMPO_PK,V_UPDATE_QVD)
+    
+	SET v_DIA_INICIO = 1;
+	v_MES_AUX = MID(V_ANIOMES,5,2)*1;
+	
+	SWITCH v_MES_AUX 
+										
+		CASE 1,3,5,7,8,10,12 
+			v_DIA_LIMITE = 31;
+		CASE 4,6,9,11 
+			v_DIA_LIMITE = 30;
+		CASE 2 
+			IF ((MOD(i,4)=0 AND MOD(i,100)<>0) OR MOD(i,400) = 0) THEN
+				v_DIA_LIMITE = 29;
+			ELSE
+				v_DIA_LIMITE = 28;
+			ENDIF;
+			
+	ENDSWITCH
+	
+	
+	
+	
+	IF '$(V_TIPO_BD)' = 'POSTGRES' THEN
+
+		v_FECHA_INICIO = '01/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4);
+		v_FECHA_LIMITE = v_DIA_LIMITE&'/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4);
+
+	ELSEIF '$(V_TIPO_BD)' = 'ORACLE' THEN 
+		//ESTO ES PARA LOS CAMPOS DE BD ORACLE DONDE SUS CAMPOS SON TIMESTAMP Y NO DATE COMO ES LO NORMAL
+		
+		IF '$(V_TIPOCAMPOBUSQUEDA)' = 'DATE' OR '$(V_TIPOCAMPOBUSQUEDA)' = '' THEN
+		
+			v_FECHA_INICIO = DATE('01/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4),'YYYYMMDD');
+			v_FECHA_LIMITE = DATE(v_DIA_LIMITE&'/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4),'YYYYMMDD');
+			
+		ELSEIF '$(V_TIPOCAMPOBUSQUEDA)' = 'TIMESTAMP' THEN
+		
+			v_FECHA_INICIO = '01/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4)&' 00:00:00 ';
+			v_FECHA_LIMITE = v_DIA_LIMITE&'/'&MID(V_ANIOMES,5,2)&'/'&MID(V_ANIOMES,1,4)&' 23:59:59 ';
+		
+		ENDIF;
+		
+	ENDIF;
+	
+	LET vLlavePKSQL = '';
+	
+	IF V_CAMPO_PK = '' THEN 
+		vLlavePKSQL = 'NULL' ;
+	ELSE 
+		vLlavePKSQL = REPLACE('$(V_CAMPO_PK)','&','||');
+	ENDIF;
+	
+	Trace DEL $(v_FECHA_INICIO) AL $(v_FECHA_LIMITE) - $(V_TIPO_PERIODO);
+	
+	IF '$(V_TIPO_PERIODO)' = 'FECHA' THEN
+		
+		
+		$(V_PREFIJO)$(V_ANIOMES):
+		LOAD $(V_CAMPOS_QV);
+			
+			SELECT $(V_CAMPOS_SQL), $(vLlavePKSQL) AS PK
+			FROM $(V_ESQUEMA).$(V_TABLA) 
+			WHERE TO_CHAR($(V_CAMPO_ANIOMES_CONDICION),'YYYYMMDD') BETWEEN '$(v_FECHA_INICIO)' AND '$(v_FECHA_LIMITE)' $(V_CONDICIONES)
+			$(V_GROUPBY);
+
+			//TO_CHAR($(V_CAMPO_ANIOMES_CONDICION),'YYYYMM') = $(V_ANIOMES)
+			
+	ELSEIF '$(V_TIPO_PERIODO)' = 'PERIODO' THEN  
+		
+
+		$(V_PREFIJO)$(V_ANIOMES):
+		LOAD $(V_CAMPOS_QV);
+		
+			SELECT $(V_CAMPOS_SQL), $(vLlavePKSQL) AS PK
+			FROM $(V_ESQUEMA).$(V_TABLA) 
+			WHERE $(V_CAMPO_ANIOMES_CONDICION) = $(V_ANIOMES) $(V_CONDICIONES)
+			$(V_GROUPBY);
+			
+
+	end if;
+	
+	IF '$(V_TIPO_BD)' = 'POSTGRES' THEN
+		v_RUTAQVD = '$(RUTA_QVD_EXTRACCION )';
+	ELSEIF '$(V_TIPO_BD)' = 'ORACLE' THEN 
+		v_RUTAQVD = '$(RUTAORA_QVD_EXTRACCION)'; 
+	ENDIF;
+
+	
+	
+
+	IF V_UPDATE_QVD THEN 
+	
+		TRACE UPDATING $(V_PREFIJO) QVD...;
+		/**************************BLOQUE DE INSERSION Y ACTUALIZACION DE QVD**************************************/
+		//CARGA TODOS LOS REPOSITORIOS A MEMORIAY EXCLUYE LOS CARGADO EN LA RECARGA MENSUAL
+		//SE CREA CAMPO AUXILIAR AUX_2 PARA EVITAR QUE SE CONCATENE CON LA TABLA DE LA RECARGA MENSUAL
+		$(V_PREFIJO)$(V_ANIOMES)_AUX:
+		LOAD *,PK AS AUX_2
+		FROM  'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_*.qvd' (qvd) 
+		WHERE NOT Exists(PK); 
+		
+
+		
+		CONCATENATE($(V_PREFIJO)$(V_ANIOMES)_AUX) 
+		//CONCATENA LOS VALORES DE MA RECARGA MENSUAL A LOS REGISTROS DEPURADOS 
+		LOAD * 
+		RESIDENT $(V_PREFIJO)$(V_ANIOMES);
+
+		//SE ELIMINA EL CAMPO AUXILIAR PARA EVITAR GUARDARLO EN EL QVD
+		DROP FIELD AUX_2 FROM $(V_PREFIJO)$(V_ANIOMES)_AUX;
+		
+		TRACE GENERATING $(V_PREFIJO) QVD UPDATED...;
+		
+		STORE $(V_PREFIJO)$(V_ANIOMES)_AUX INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO).qvd' (qvd);
+		DROP Table $(V_PREFIJO)$(V_ANIOMES)_AUX;
+
+		/**************************------------------------------------------------------------------**************************************/
+	
+	ENDIF;
+	
+	
+	TRACE GENERATING $(V_PREFIJO)_$(V_ANIOMES) QVD INCREMENTAL...;
+	
+	STORE $(V_PREFIJO)$(V_ANIOMES) INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES).qvd' (qvd);
+	DROP TABLE $(V_PREFIJO)$(V_ANIOMES);
+	
+	CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
+	
+	//STORE $(V_PREFIJO)$(V_ANIOMES) INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES).qvd' (qvd);
+	//DROP Table $(V_PREFIJO)$(V_ANIOMES);
+	
+	//TRACE $(V_TIPO_BD) - $(v_RUTAQVD)/$(V_PREFIJO)/$(V_ANIOMES)  REPOSITORIO CREADO CORRECTAMENTE;
+
+END Sub;
+
+
+//ultima modificacion : 01-07-15 por ARC
+SUB GENERATE_QVD_X_ANIOMESDIA_PG(V_TIPO_BD,V_ANIOMESDIA,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_ANIOMES_CONDICION,V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY,V_TIPOCAMPOBUSQUEDA,V_CAMPO_PK,V_UPDATE_QVD)
+							 //V_TIPO_BD,V_PERIODO,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY
+	
+	v_FECHA_INICIO = MID(V_ANIOMESDIA,7,2)&'/'&MID(V_ANIOMESDIA,5,2)&'/'&MID(V_ANIOMESDIA,1,4);
+	v_FECHA_LIMITE = MID(V_ANIOMESDIA,7,2)&'/'&MID(V_ANIOMESDIA,5,2)&'/'&MID(V_ANIOMESDIA,1,4);
+	
+	
+	
+	$(V_PREFIJO)$(V_ANIOMESDIA):
+	LOAD $(V_CAMPOS_QV);
+	
+		SELECT $(V_CAMPOS_SQL)
+		FROM $(V_ESQUEMA).$(V_TABLA) 
+		WHERE $(V_CAMPO_ANIOMES_CONDICION) BETWEEN '$(v_FECHA_INICIO)' AND '$(v_FECHA_LIMITE)'  $(V_CONDICIONES)
+		$(V_GROUPBY);
+		
+	
+	
+	IF '$(V_TIPO_BD)' = 'POSTGRES' THEN
+		v_RUTAQVD = RUTAPG;
+	ELSEIF '$(V_TIPO_BD)' = 'ORACLE' THEN 
+		v_RUTAQVD = RUTAORA;
+	ENDIF;
+		
+	STORE $(V_PREFIJO)$(V_ANIOMESDIA) INTO [$(v_RUTAQVD)$(V_PREFIJO)$(V_ANIOMESDIA).qvd] (qvd);
+	DROP Table $(V_PREFIJO)$(V_ANIOMESDIA);
+	
+
+END Sub;
+
+
+SUB GENERATE_QVD_X_ANIO_PG(V_TIPO_BD,V_ANIO,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_ANIOMES_CONDICION,V_TIPO_PERIODO,V_CONDICIONES,V_GROUPBY)
+	
+	
+	v_FECHA_INICIO = '01/01/'&V_ANIO;
+	v_FECHA_LIMITE = '31/12/'&V_ANIO;
+	
+		
+	IF '$(V_TIPO_PERIODO)' = 'FECHA' THEN
+		
+		$(V_PREFIJO)$(V_ANIO):
+		LOAD $(V_CAMPOS_QV);
+		
+			SELECT $(V_CAMPOS_SQL)
+			FROM $(V_ESQUEMA).$(V_TABLA) 
+			WHERE $(V_CAMPO_ANIOMES_CONDICION) BETWEEN '$(v_FECHA_INICIO)' AND '$(v_FECHA_LIMITE)'  $(V_CONDICIONES)
+			$(V_GROUPBY);
+
+			//TO_CHAR($(V_CAMPO_ANIOMES_CONDICION),'YYYYMM') = $(V_ANIOMES)
+			
+	ELSEIF '$(V_TIPO_PERIODO)' = 'PERIODO' THEN  
+		
+		$(V_PREFIJO)$(V_ANIO):
+		LOAD $(V_CAMPOS_QV);
+		
+			SELECT $(V_CAMPOS_SQL)
+			FROM $(V_ESQUEMA).$(V_TABLA) 
+			WHERE $(V_CAMPO_ANIOMES_CONDICION) = $(V_ANIO)  $(V_CONDICIONES)
+			$(V_GROUPBY);
+		
+	ENDIF;
+		
+	
+	IF '$(V_TIPO_BD)' = 'POSTGRES' THEN
+		v_RUTAQVD = RUTAPG;
+	ELSEIF '$(V_TIPO_BD)' = 'ORACLE' THEN 
+		v_RUTAQVD = RUTAORA;
+	ENDIF;
+		
+	STORE $(V_PREFIJO)$(V_ANIO) INTO [$(v_RUTAQVD)$(V_PREFIJO)$(V_ANIO).qvd] (qvd);
+
+	DROP Table $(V_PREFIJO)$(V_ANIO);
+	
+	//TRACE $(V_PREFIJO)$(V_ANIO)  & 'REPOSITORIO CREADO CORRECTAMENTE';
+
+END Sub;
+
+/*******************************************************************************************/
+
+/*FUNCION QUE RECUPERA UNA AÑO MINIMO, EN LA VARIABLE V_CAMPOS_SQL SE DEBE ESPECIFICAR EL CAMPO DE TIPO FECHA DE LA TABLA*/
+
+
+
+
+
+/*FUNCION QUE GENERA QVD SOLO CON LA CLAUSULA WHERE DONDE SE LE PASAN LOS VALORES POR LA VARIABLE V_CONDICIONES*/
+SUB GENERATE_QVD_ALL(V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_PERIODO_UPD)
+		
+		IF FileTime('[lib://$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_TABLA).qvd]') > 0 AND V_UPDATE_QVD THEN
+			TRACE GENERA RECARGA FULL CON UPDATE;	
+			CALL CARGA_SAP_ACTUALIZADA(V_ESQUEMA,V_TABLA,V_PREFIJO,V_CAMPO_PK,V_PERIODO_UPD);
+			
+		ELSE 
+		
+			IF TRIM('$(V_CONDICIONES)') = '' OR TRIM('$(V_CONDICIONES)') = '1=1' THEN 
+				V_CONDICIONES = 'TRUE = TRUE';
+			ELSE 
+				V_CONDICIONES = 'AND '&V_CONDICIONES; 
+			ENDIF;
+		
+			TRACE GENERA RECARGA FULL DE TABLA SIN UPDATE;
+			
+			LET vLlavePKSQL = '';
+			
+			IF V_CAMPO_PK = '' THEN 
+				vLlavePKSQL = 'NULL()' ;
+			ELSE 
+				vLlavePKSQL = REPLACE('$(V_CAMPO_PK)','||','&');
+			ENDIF;
+			
+			
+			$(V_PREFIJO):
+			LOAD $(V_CAMPOS_QV), $(vLlavePKSQL) AS PK;
+			
+				SELECT $(V_CAMPOS_SQL) 
+				FROM $(V_ESQUEMA).$(V_TABLA) 
+				WHERE $(V_CONDICIONES);
+				
+				
+			STORE $(V_PREFIJO) INTO 'lib://$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_PREFIJO).qvd'(qvd);
+			TRACE '$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_PREFIJO)'  REPOSITORIO CREADO CORRECTAMENTE;
+			DROP Table $(V_PREFIJO);
+			
+			CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
+		
+		ENDIF;
+		
+
+END Sub;
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+SUB GENERATE_QVD(V_TIPO_BD,v_INICIO,v_ANIO_LIMITE,V_MES_INICIAL,V_MES_LIMITE,V_DIA_INICIAL,V_DIA_LIMITE,V_TIPO,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY,V_TIPOCAMPOBUSQUEDA,V_CAMPO_PK,V_UPDATE_QVD,V_UPD_DIAS_ATRAS)
+		
+		
+		IF '$(V_TIPO)' <> 'ALL' THEN
+			trace INICIA PROCESO DE : $(V_PREFIJO) EN EL AÑO : $(v_INICIO) Y MES : $(V_MES_INICIAL);
+			i=0;
+			FOR i=v_INICIO to v_ANIO_LIMITE
+				
+					IF '$(V_TIPO)' = 'YEAR' THEN 
+						trace INICIA EL AÑO : $(i) PARA $(V_PREFIJO);	
+						CALL GENERATE_QVD_X_ANIO_PG(V_TIPO_BD,i,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY);	
+						
+					ELSE
+					
+					
+						IF v_ANIO_LIMITE = v_INICIO AND i = v_INICIO THEN
+						
+							LET v_PERIODO_INICIO = NUM(i&V_MES_INICIAL);
+							LET v_PERIODO_LIMITE = NUM(i&V_MES_LIMITE);
+
+						ELSEIF v_ANIO_LIMITE > v_INICIO AND i = v_INICIO THEN
+						
+							LET v_PERIODO_INICIO = NUM(i&V_MES_INICIAL);
+							LET v_PERIODO_LIMITE = NUM(i&'12');
+							
+						ELSEIF i > v_INICIO AND i < v_ANIO_LIMITE THEN
+
+							LET v_PERIODO_INICIO = NUM(i&'01');
+							LET v_PERIODO_LIMITE = NUM(i&'12');
+							
+						ELSE 
+						
+							LET v_PERIODO_INICIO = NUM(i&'01');
+							LET v_PERIODO_LIMITE = NUM(i&V_MES_LIMITE);
+							
+						ENDIF;
+						
+						
+						
+						
+						trace INICIA EL AÑO : $(i) CON INICIO $(v_PERIODO_INICIO) Y LIMITE $(v_PERIODO_LIMITE);
+						FOR k_PERIODO=v_PERIODO_INICIO to v_PERIODO_LIMITE 
+							
+							TRACE PERIODO EN CURSO : $(k_PERIODO);
+							
+							IF NUM(RIGHT(k_PERIODO,2)) <= 12 AND NUM(RIGHT(k_PERIODO,2)) > 0 THEN 	
+								k = NUM(RIGHT(k_PERIODO,2));
+								
+                                
+							
+							/**/
+								IF i = YEAR(NOW()) AND k > Month(NOW()) THEN 
+								
+									TRACE EL PERIODO EJECUTADO SUPERA EL ACTUAL ACTUAL : $(k_PERIODO);
+								
+								ELSE
+									
+									//CALCULA LOS DIAS POR MESES
+									v_mes = if(k<10,0&'$(k)',k);
+									V_PERIODO = i & v_mes;
+									
+									IF '$(V_TIPO)' = 'MONTH' THEN 
+									
+										TRACE $(i) GENERANDO QVD PARA PERIODO $(V_PERIODO) DE $(V_ESQUEMA).$(V_TABLA) DE LA BD $(V_TIPO_BD) CON CAMPO DE CORTE $(V_CAMPO_FECHA_CONDICION) TIPO $(V_TIPOCAMPOBUSQUEDA);
+
+										
+										CALL GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_PERIODO,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY,V_TIPOCAMPOBUSQUEDA,V_CAMPO_PK,V_UPDATE_QVD);
+										
+											 //GENERATE_QVD_X_ANIOMES_PG(V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CAMPO_ANIOMES_CONDICION,V_CONDICIONES)
+									ELSEIF '$(V_TIPO)' = 'DAY' THEN 
+											
+											IF(V_DIA_LIMITE = 'FINMES' OR IsText(V_DIA_LIMITE)) THEN
+												
+												SWITCH k 
+												
+													CASE 1,3,5,7,8,10,12 
+														v_DIA_LIMITE = 31;
+													CASE 4,6,9,11 
+														v_DIA_LIMITE = 30;
+													CASE 2 
+														IF ((MOD(i,4)=0 AND MOD(i,100)<>0) OR MOD(i,400) = 0) THEN
+															v_DIA_LIMITE = 29;
+														ELSE
+															v_DIA_LIMITE = 28;
+														ENDIF;
+														
+												ENDSWITCH
+																				
+											ENDIF;
+												
+												FOR m=V_DIA_INICIAL to v_DIA_LIMITE 
+													
+													IF i = YEAR(NOW()) AND k = Month(NOW()) AND m > DAY(now()) THEN
+													ELSE
+														
+														v_dia = if(m<10,0&'$(m)',m);
+													
+														v_PERIODO = i&v_mes&v_dia;
+														
+														//trace '$(v_PERIODO)';
+														//TRACE '$(v_PERIODO)';
+														CALL GENERATE_QVD_X_ANIOMESDIA_PG(V_TIPO_BD,'$(v_PERIODO)',$(V_PREFIJO),$(V_ESQUEMA),$(V_TABLA),$(V_CAMPOS_QV),$(V_CAMPOS_SQL),$(V_CAMPO_FECHA_CONDICION),V_TIPO_FECHA,V_CONDICIONES,V_GROUPBY);
+														
+														
+														TRACE GENERANDO QVD PARA PERIODO $(V_PERIODO) DE $(v_PERIODO).$(V_TABLA) DE LA BD $(V_TIPO_BD) CON CAMPO DE CORTE $(V_CAMPO_FECHA_CONDICION);
+														
+																	
+													ENDIF
+																	
+												
+												NEXT m;
+									
+									ENDIF;	
+
+									
+									
+								ENDIF;	
+								
+							/**/
+							ELSE
+							
+								
+							
+							ENDIF
+							
+							
+						NEXT k_PERIODO;
+
+					ENDIF;		
+							
+			NEXT i;
+			
+		ELSE
+		
+			
+				
+			IF V_UPDATE_QVD THEN 	
+				
+				CALL GENERATE_QVD_ALL(V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_UPD_DIAS_ATRAS);
+				
+				
+			
+			ELSE 
+			
+				CALL GENERATE_QVD_ALL(V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD);
+			
+			ENDIF;
+			
+			
+			
+			
+			
+			
+		
+		ENDIF;
+		
+ENDSUB;
+
+
+/****************************************************************************************************************/
+//FUNCION QUE DESENCADENA TODAS LAS ANTERIORES
+SUB GENERAR_QVD(TIPO,PROPIETARIO,TABLA,PREFIJO_QVD,CAMPOS_QV,CAMPOS_SQL,FECHA_BUSQUEDA,TIPO_RECARGA,WHERE_CONDICIONES,CAMPO_PK,UPDATE_QVD,V_UPD_DIAS_ATRAS)
+	
+	IF(MATCH('$(TIPO)','ALL' ,'YEAR','MONTH','DAY')) THEN 
+		CALL GENERATE_QVD('ORACLE',$(v_ANIOINICIAL),$(v_ANIOLIMITE),$(v_MES_INICIAL),$(v_MES_LIMITE),$(v_DIA_INICIAL),$(v_DIA_LIMITE),'$(TIPO)','$(PREFIJO_QVD)','$(PROPIETARIO)','$(TABLA)','$(CAMPOS_QV)','$(CAMPOS_SQL)','$(FECHA_BUSQUEDA)','$(TIPO_RECARGA)','$(WHERE_CONDICIONES)','','DATE','$(CAMPO_PK)',UPDATE_QVD,V_UPD_DIAS_ATRAS)
+	ELSE
+		TRACE PARAMETRO TIPO DE CARGA : $(TIPO) NO ADMITIDO;
+		EXIT SCRIPT;
+	ENDIF;
+	
+	
+
+ENDSUB;
+/*****************************************************************************************************************/
+
+
+
+/******************************CARGA ACTUALIZADA *******************************************/
+SUB CARGA_SAP_ACTUALIZADA(V_ESQUEMA,vTabla,V_PREFIJO,vLlavePK,vPeriodo)
+	
+	//LA TABLA CDPOS DEBE HABER SIDO EJECUTADA ANTES QUE ESTE PROCESO		
+	let vPeriodoFIN = date(today(),'YYYYMMDD');
+	let vPeriodoINI = date(today()-vPeriodo,'YYYYMMDD');
+
+	//OBTIENE LOS CODIGOS PRIMARIOS DE LA TABLA EN EL PERIODO QUE SE QUIERE EXTRAER
+	TRACE OBTIENE LOS PK DE $(vTabla) EN CDPOS CON RANGOS $(vPeriodoINI) - $(vPeriodoFIN);
+	
+	CDPOS_CODIGOS:
+	LOAD DISTINCT TABKEY AS PK;
+	SQL 
+	SELECT Distinct CDPOS.TABKEY 
+	FROM $(V_ESQUEMA).CDPOS CDPOS 
+	INNER JOIN $(V_ESQUEMA).CDHDR CDHDR ON (CDPOS.OBJECTCLAS = CDHDR.OBJECTCLAS AND CDPOS.OBJECTID = CDHDR.OBJECTID AND CDPOS.CHANGENR = CDHDR.CHANGENR)   
+	WHERE  LEFT(CDHDR.UDATE,8) BETWEEN $(vPeriodoINI) AND $(vPeriodoFIN) AND CDPOS.MANDANT = 400 AND CDPOS.TABNAME = '$(vTabla)';
+	
+	
+	//GENERA UNA LINEA CONTODOS LOS CODIGOS PARA INCRUSTARLOS AL SQL
+	Let vNoFilasCDPOS = NoOfRows('CDPOS_CODIGOS');
+
+	IF vNoFilasCDPOS = 0 THEN 
+		
+		TRACE SE FINALIZA EL PROCESO PORQUE NO SE ENCONTRO NUEVOS REGISTROS O ACTUALZIACIONES EN CDPOS PARA $(vTabla); 
+		EXIT SCRIPT;
+	
+	ENDIF;
+
+	Let vLlaves = '';
+
+	For v_nroFilas = 1 to vNoFilasCDPOS
+
+		Let vLlaves = ''''&FieldValue('PK',$(v_nroFilas))&''''&','&vLlaves;
+
+	Next v_nroFilas;
+	
+	vLlaves = LEFT('$(vLlaves)',(LEN('$(vLlaves)')-1));
+	
+	
+	// REEMPLAZA EL & POR || QUE ES EL SIMBOLO DE CONCATENACION DE SQL
+	vLlavePKSQL = REPLACE('$(vLlavePK)','&','||');
+		
+		
+	//OBTIENE DE LOS DATOS DE LA TABLA EXCEPTO LOS ENCONTRADOS EN CDPOS Y LSO CONCATENA CON LOS DATOS ENCONTRADOS EN CDPOS DESDE LA FUENTE SQL
+	//DE ESA FORMA SE ACTUALIZAN LOS DATOS E INSERTAN LOS NUEVOS
+
+	TMP_$(V_PREFIJO):
+	LOAD * 
+	FROM [lib://$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_PREFIJO).qvd](qvd)
+	WHERE NOT EXISTS(PK);
+	
+	CONCATENATE(TMP_$(V_PREFIJO))
+	
+	LOAD *, $(vLlavePK) AS PK;
+	SQL SELECT *
+    FROM SAPABAP1.$(vTabla)
+    WHERE $(vLlavePKSQL) in ($(vLlaves));
+
+	DROP TABLE CDPOS_CODIGOS;
+	
+	STORE TMP_$(V_PREFIJO) INTO 'lib://$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_PREFIJO).qvd'(qvd);
+	TRACE '$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_PREFIJO)'  REPOSITORIO CREADO CORRECTAMENTE;
+	DROP Table TMP_$(V_PREFIJO); 
+	
+	CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
+
+
+ENDSUB;
+
+
+SUB STOREQVD(V_NOMBREQVD,V_SWDELETE)
+
+	store $(V_NOMBREQVD) into 'lib://$(RUTAORA_QVD_TRANSFORMACION)/$(V_NOMBREQVD).qvd'(qvd);
+	
+	IF V_SWDELETE THEN 
+		drop table $(V_NOMBREQVD);
+	ENDIF;
+
+ENDSUB;
+
