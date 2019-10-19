@@ -3,7 +3,7 @@
 //COMPATIBILIDAD : QLIKVIEW - QLIK SENSE
 //FECHA CREACION : 11/2014
 //FECHA ULTIMA REVISION : 03/2019
-//github58
+//github58 adrian
 /********************************************************************/
 
 SUB INIT(CN,CNLIB,CNLIB_TRA)
