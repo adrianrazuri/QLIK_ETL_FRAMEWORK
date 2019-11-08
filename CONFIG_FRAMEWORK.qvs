@@ -6,7 +6,7 @@
 //github58 adrian
 /********************************************************************/
 
-SET TypeQlik = 'QS';
+SET @TypeQlik = 'QS';
 
 
 SUB INIT(CN,CNLIB,CNLIB_TRA,CNLIB_AUX)
@@ -34,8 +34,8 @@ SUB INIT(CN,CNLIB,CNLIB_TRA,CNLIB_AUX)
     SET DayNames='lun.;mar.;mié.;jue.;vie.;sáb.;dom.';
     SET LongDayNames='lunes;martes;miércoles;jueves;viernes;sábado;domingo';
     
-	LET StopHour = Null();
-	LET ConditionalReloadRange = Null();
+	LET @StopHour = Null();
+	LET @ConditionalReloadRange = Null();
     LET StrConexion = '$(CN)';
 
  	LET RUTAORA_QVD_EXTRACCION = '$(CNLIB)';
@@ -49,9 +49,9 @@ SUB INIT(CN,CNLIB,CNLIB_TRA,CNLIB_AUX)
 // 	SET RUTA_PLANOS = '..\5.Planos\';
 // 	SET RUTA_QVD_ODS = '..\4.QVD\4.ODS\'; 
 	
-	IF TypeQlik = 'QS' THEN
+	IF @TypeQlik = 'QS' THEN
 		SET msgMSG = 'Qlik Sense';
-	ELSEIF TypeQlik = 'QS' THEN 
+	ELSEIF @TypeQlik = 'QS' THEN 
 		SET msgMSG = 'QlikView';
 	ENDIF;
 
@@ -109,11 +109,11 @@ END SUB;
 //FUNCION QUE ESTABLECE LOS PERIODOS DE RECARGA EN FUNCION A LA HORA DE EJECUCION
 SUB RELOAD_DATA(P_ANIOINICIAL,P_MES_INICIAL,P_ANIOLIMITE,P_MES_LIMITE)
 	
-	IF(NOT IsNull(StopHour) and StopHour <> '') THEN
+	IF(NOT IsNull(@StopHour) and @StopHour <> '') THEN
 	
-		FOR I=1 TO (SubStringCount(StopHour,';')+1)
-			IF v_HORASTOP = SubField(StopHour,';',$(I)) THEN
-				vAuxHour = Replace('$(StopHour)',';',',');
+		FOR I=1 TO (SubStringCount(@StopHour,';')+1)
+			IF v_HORASTOP = SubField(@StopHour,';',$(I)) THEN
+				vAuxHour = Replace('$(@StopHour)',';',',');
 				TRACE >>>>>>>>>Fin del proceso por restriccion de horas $(vAuxHour);
 				exit script;
 			ENDIF;
@@ -138,9 +138,9 @@ SUB RELOAD_DATA(P_ANIOINICIAL,P_MES_INICIAL,P_ANIOLIMITE,P_MES_LIMITE)
 
 	
 	let vswPeriodo = false();
-	IF(NOT IsNull(ConditionalReloadRange) and ConditionalReloadRange <> '') THEN 
-		FOR I=1 TO (SubStringCount(ConditionalReloadRange,';')+1)
-			    vAuxGrupoHoras = SubField(ConditionalReloadRange,';',$(I)) 
+	IF(NOT IsNull(@ConditionalReloadRange) and @ConditionalReloadRange <> '') THEN 
+		FOR I=1 TO (SubStringCount(@ConditionalReloadRange,';')+1)
+			    vAuxGrupoHoras = SubField(@ConditionalReloadRange,';',$(I)) 
 				vAuxHoras = SubField(vAuxGrupoHoras,'=>',1); 
 				vAuxMeses = SubField(vAuxGrupoHoras,'=>',2);
 
@@ -458,7 +458,7 @@ END Sub;
 
 
 /*FUNCION QUE GENERA QVD SOLO CON LA CLAUSULA WHERE DONDE SE LE PASAN LOS VALORES POR LA VARIABLE V_CONDICIONES*/
-SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_PERIODO_UPD)
+SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_PERIODO_UPD,PARAM_11,PARAM_12)
 		
 		IF FileTime('[lib://$(RUTAORA_QVD_EXTRACCION)/$(V_ESQUEMA)_$(V_TABLA).qvd]') > 0 AND V_UPDATE_QVD AND V_TIPO_BD = 'SAP' THEN
 
@@ -468,7 +468,7 @@ SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_
 		ELSE 
 		
 			IF TRIM('$(V_CONDICIONES)') = '' OR TRIM('$(V_CONDICIONES)') = '1=1' THEN 
-				V_CONDICIONES = 'TRUE = TRUE';
+				V_CONDICIONES = '1 = 1';
 			ELSE 
 				V_CONDICIONES = 'AND '&V_CONDICIONES; 
 			ENDIF;
@@ -482,7 +482,6 @@ SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_
 			ELSE 
 				vLlavePKSQL = REPLACE('$(V_CAMPO_PK)','||','&');
 			ENDIF;
-			
 
 			
 			$(V_PREFIJO):
@@ -493,9 +492,28 @@ SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_
 				FROM $(V_ESQUEMA).$(V_TABLA) 
 				WHERE $(V_CONDICIONES);
 			ELSE
+				set aux_tipo_xls = '';
+				if '$(V_TIPO_BD)' = 'XLS' THEN
+					aux_tipo_xls = 'biff';
+				ELSE
+					aux_tipo_xls = 'ooxml';
+				ENDIF;
+
+				IF PARAM_11 = TRUE() THEN 
+					aux_cabeceras = 'embedded labels';
+				ELSE
+					aux_cabeceras = 'no labels';
+				ENDIF;
+
+				IF PARAM_12 <> '0' THEN
+					aux_poscabecera = 'header is '&$(PARAM_12)&' lines, ';
+				ELSE
+					aux_poscabecera = '';
+				ENDIF;
+
 				LOAD $(V_CAMPOS_SQL)
-				FROM [lib://FRAMEWORK/$(V_ESQUEMA).$(V_TIPO_BD)]
-				(ooxml, embedded labels, header is 1 lines, table is $(V_TABLA));
+				FROM [lib://FRAMEWORK/$(V_ESQUEMA).$(V_TIPO_BD)]($(aux_tipo_xls), $(aux_cabeceras), $(aux_poscabecera) table is $(V_TABLA))
+				WHERE $(V_CONDICIONES);
 			ENDIF;	
 
 			exit script;			
@@ -617,12 +635,12 @@ SUB GENERATE_QVD(V_TIPO_BD,v_INICIO,v_ANIO_LIMITE,V_MES_INICIAL,V_MES_LIMITE,V_D
 			NEXT i;
 			
 		ELSE
-			
+		
 			IF V_UPDATE_QVD THEN 	
-				CALL GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_UPD_DIAS_ATRAS);
+				CALL GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_UPD_DIAS_ATRAS,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA);
 			ELSE 
 				
-				CALL GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD);
+				CALL GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_UPD_DIAS_ATRAS,V_CAMPO_FECHA_CONDICION,V_TIPO_FECHA);
 			ENDIF;
 			
 		ENDIF;
