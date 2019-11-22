@@ -47,10 +47,12 @@ SUB INIT(CN,CNLIB,CNLIB_TRA,CNLIB_AUX)
     LET @StrConexion = '$(CN)';
 	LET @StoreQVD = true();
 	LET @DropQVD = true();
+	LET @TypeStore = 'qvd';
 
  	LET @DirectoryQVD_EXT = '$(CNLIB)';
 	LET @DirectoryQVD_TRA = '$(CNLIB_TRA)';
-	LET vfrm_Ruta_QVD_Auxiliares = '$(CNLIB_AUX)';
+	//LET @DirectoryQVD_AUX = '$(CNLIB_AUX)';
+	LET @DirectoryQVD_PLA = '$(CNLIB_AUX)';
 	LET @DirectoryQVD_STG = '';
 
 	if upper(@Stage) = 'E' THEN
@@ -86,9 +88,12 @@ SUB INIT(CN,CNLIB,CNLIB_TRA,CNLIB_AUX)
 // 	SET RUTA_QVD_CONFIGURACIONES = '..\4.QVD\4.Configuraciones\';
 // 	SET RUTA_PLANOS = '..\5.Planos\';
 // 	SET RUTA_QVD_ODS = '..\4.QVD\4.ODS\'; 
+
+	let @RaizQlik = ''; 
 	
 	IF @TypeQlik = 'QS' THEN
 		SET msgMSG = 'Qlik Sense';
+		@RaizQlik = 'lib://';
 	ELSEIF @TypeQlik = 'QV' THEN 
 		SET msgMSG = 'QlikView';
 	ENDIF;
@@ -212,15 +217,13 @@ END SUB
 
 SUB GET_DATAMART(V_PREFIJO,V_TABLA)
 
-	V_PREFIJO = '[lib://$(RUTA_QVD_PREPARADO)/$(V_TABLA).qvd](qvd)';
+	V_PREFIJO = '[$(@RaizQlik)$(@DirectoryQVD_TRA)/$(V_TABLA).qvd](qvd)';
 
 END Sub;
 
 SUB GET_QVD(V_PREFIJO,V_TABLA)
 	
-	TRACE $(@DirectoryQVD_EXT);
-	
-	V_PREFIJO = '[lib://$(@DirectoryQVD_EXT)/$(V_TABLA).qvd](qvd)';
+	V_PREFIJO = '[$(@RaizQlik)$(@DirectoryQVD_EXT)/$(V_TABLA).qvd](qvd)';
  
 END Sub;
 
@@ -236,13 +239,18 @@ END Sub;
 //FUNCION QUE GENERA REGISTROS CON DATOS DE ULTIMA CARGA
 SUB GENERATE_TIMEFILE(V_REPORTE_NAME)
 
-	IF FileTime('[lib://$(@DirectoryQVD_EXT)/RELOAD_APP.qvd]') > 0 THEN
+	IF @DirectoryQVD_TRA = '' THEN
+		TRACE 'Debe especificar el directorio de QVD transformados';
+		exit script;
+	ENDIF;
+
+	IF FileTime('[$(@RaizQlik)$(@DirectoryQVD_TRA)/RELOAD_APP.qvd]') > 0 THEN
 		
 		TRACE ACTUALIZANDO TIEMPO DE ACTUALIZACION DEL QVD $(V_REPORTE_NAME);
 		TIEMPO_RECARGA:
 			LOAD REPORTE,
 				 ULTIMA_CARGA 
-			FROM [lib://$(@DirectoryQVD_EXT)/RELOAD_APP.qvd](qvd) 
+			FROM [$(@RaizQlik)$(@DirectoryQVD_TRA)/RELOAD_APP.qvd](qvd) 
 			WHERE REPORTE <> '$(V_REPORTE_NAME)'; 
 
 		CONCATENATE(TIEMPO_RECARGA)
@@ -259,7 +267,7 @@ SUB GENERATE_TIMEFILE(V_REPORTE_NAME)
 	
 	ENDIF;
 
-	STORE TIEMPO_RECARGA INTO [lib://$(@DirectoryQVD_EXT)/RELOAD_APP.qvd](qvd);
+	STORE TIEMPO_RECARGA INTO [$(@RaizQlik)$(@DirectoryQVD_TRA)/RELOAD_APP.qvd](qvd);
 	DROP Table TIEMPO_RECARGA; 
 
 END SUB;
@@ -354,14 +362,6 @@ SUB GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_
 
 	end if;
 	
-	IF '$(V_TIPO_BD)' = 'POSTGRES' THEN
-		v_RUTAQVD = '$(RUTA_QVD_EXTRACCION )';
-	ELSEIF '$(V_TIPO_BD)' = 'ORACLE' THEN 
-		v_RUTAQVD = '$(@DirectoryQVD_EXT)'; 
-	ENDIF;
-
-	
-	
 
 	IF V_UPDATE_QVD THEN 
 	
@@ -371,7 +371,7 @@ SUB GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_
 		//SE CREA CAMPO AUXILIAR AUX_2 PARA EVITAR QUE SE CONCATENE CON LA TABLA DE LA RECARGA MENSUAL
 		$(V_PREFIJO)$(V_ANIOMES)_AUX:
 		LOAD *,PK AS AUX_2
-		FROM  'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_*.qvd' (qvd) 
+		FROM  '$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_ESQUEMA)_$(V_PREFIJO)_*.qvd' (qvd) 
 		WHERE NOT Exists(PK); 
 		
 
@@ -386,8 +386,9 @@ SUB GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_
 		
 		TRACE GENERATING $(V_PREFIJO) QVD UPDATED...;
 		
-		STORE $(V_PREFIJO)$(V_ANIOMES)_AUX INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO).qvd' (qvd);
-		DROP Table $(V_PREFIJO)$(V_ANIOMES)_AUX;
+
+		CALL STOREQVD('$(V_PREFIJO)$(V_ANIOMES)_AUX','$(V_ESQUEMA)_$(V_PREFIJO)');
+		CALL GENERATE_TIMEFILE('$(V_PREFIJO)$(V_ANIOMES)_AUX');
 
 		/**************************------------------------------------------------------------------**************************************/
 	
@@ -398,15 +399,14 @@ SUB GENERATE_QVD_X_ANIOMES_PG(V_TIPO_BD,V_ANIOMES,V_PREFIJO,V_ESQUEMA,V_TABLA,V_
 	
 	IF @StoreQVD THEN
 
-		STORE $(V_PREFIJO)$(V_ANIOMES) INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES).qvd' (qvd);
-		DROP TABLE $(V_PREFIJO)$(V_ANIOMES);
-		CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
+		CALL STOREQVD('$(V_PREFIJO)$(V_ANIOMES)','$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES)');
+		CALL GENERATE_TIMEFILE('$(V_PREFIJO)$(V_ANIOMES)');
 
 	ENDIF;
 
 	
 	
-	//STORE $(V_PREFIJO)$(V_ANIOMES) INTO 'lib://$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES).qvd' (qvd);
+	//STORE $(V_PREFIJO)$(V_ANIOMES) INTO '$(@RaizQlik)$(v_RUTAQVD)/$(V_ESQUEMA)_$(V_PREFIJO)_$(V_ANIOMES).qvd' (qvd);
 	//DROP Table $(V_PREFIJO)$(V_ANIOMES);
 	
 	//TRACE $(V_TIPO_BD) - $(v_RUTAQVD)/$(V_PREFIJO)/$(V_ANIOMES)  REPOSITORIO CREADO CORRECTAMENTE;
@@ -489,8 +489,7 @@ SUB GENERATE_QVD_X_ANIO_PG(V_TIPO_BD,V_ANIO,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS
 
 	IF @StoreQVD THEN
 		
-		STORE $(V_PREFIJO)$(V_ANIO) INTO [$(v_RUTAQVD)$(V_PREFIJO)$(V_ANIO).qvd] (qvd);
-		DROP Table $(V_PREFIJO)$(V_ANIO);
+		CALL STOREQVD('$(V_PREFIJO)','$(V_PREFIJO)$(V_ANIO)');
 		CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
 	
 	ENDIF;
@@ -509,7 +508,7 @@ END Sub;
 /*FUNCION QUE GENERA QVD SOLO CON LA CLAUSULA WHERE DONDE SE LE PASAN LOS VALORES POR LA VARIABLE V_CONDICIONES*/
 SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_SQL,V_CONDICIONES,V_CAMPO_PK,V_UPDATE_QVD,V_PERIODO_UPD,PARAM_11,PARAM_12)
 		
-		IF FileTime('[lib://$(@DirectoryQVD_EXT)/$(V_ESQUEMA)_$(V_TABLA).qvd]') > 0 AND V_UPDATE_QVD AND V_TIPO_BD = 'SAP' THEN
+		IF FileTime('[$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_ESQUEMA)_$(V_TABLA).qvd]') > 0 AND V_UPDATE_QVD AND V_TIPO_BD = 'SAP' THEN
 
 			TRACE GENERA RECARGA FULL CON UPDATE PARA SAP;	
 			CALL CARGA_SAP_ACTUALIZADA(V_ESQUEMA,V_TABLA,V_PREFIJO,V_CAMPO_PK,V_PERIODO_UPD);
@@ -541,6 +540,12 @@ SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_
 				FROM $(V_ESQUEMA).$(V_TABLA) 
 				WHERE $(V_CONDICIONES);
 			ELSE
+				
+				IF @DirectoryQVD_PLA = '' THEN
+					TRACE ********Debe especificar el directorio del archivo excel en el directorio PLANOS********;
+					exit script;
+				ENDIF;
+
 				set aux_tipo_xls = '';
 				if '$(V_TIPO_BD)' = 'XLS' THEN
 					aux_tipo_xls = 'biff';
@@ -561,7 +566,7 @@ SUB GENERATE_QVD_ALL(V_TIPO_BD,V_PREFIJO,V_ESQUEMA,V_TABLA,V_CAMPOS_QV,V_CAMPOS_
 				ENDIF;
 
 				LOAD $(V_CAMPOS_SQL)
-				FROM [lib://FRAMEWORK/$(V_ESQUEMA).$(V_TIPO_BD)]($(aux_tipo_xls), $(aux_cabeceras), $(aux_poscabecera) table is $(V_TABLA))
+				FROM [$(@RaizQlik)$(@DirectoryQVD_PLA)/$(V_ESQUEMA).$(V_TIPO_BD)]($(aux_tipo_xls), $(aux_cabeceras), $(aux_poscabecera) table is $(V_TABLA))
 				WHERE $(V_CONDICIONES);
 			ENDIF;	
 
@@ -773,7 +778,7 @@ SUB CARGA_SAP_ACTUALIZADA(V_ESQUEMA,vTabla,V_PREFIJO,vLlavePK,vPeriodo)
 
 	TMP_$(V_PREFIJO):
 	LOAD * 
-	FROM [lib://$(@DirectoryQVD_EXT)/$(V_ESQUEMA)_$(V_PREFIJO).qvd](qvd)
+	FROM [$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_ESQUEMA)_$(V_PREFIJO).qvd](qvd)
 	WHERE NOT EXISTS(PK);
 	
 	CONCATENATE(TMP_$(V_PREFIJO))
@@ -785,9 +790,11 @@ SUB CARGA_SAP_ACTUALIZADA(V_ESQUEMA,vTabla,V_PREFIJO,vLlavePK,vPeriodo)
 
 	DROP TABLE CDPOS_CODIGOS;
 	
-	STORE TMP_$(V_PREFIJO) INTO 'lib://$(@DirectoryQVD_EXT)/$(V_ESQUEMA)_$(V_PREFIJO).qvd'(qvd);
-	TRACE '$(@DirectoryQVD_EXT)/$(V_ESQUEMA)_$(V_PREFIJO)'  REPOSITORIO CREADO CORRECTAMENTE;
-	DROP Table TMP_$(V_PREFIJO); 
+	CALL STOREQVD('TMP_$(V_PREFIJO)','$(V_ESQUEMA)_$(V_PREFIJO)');
+	TRACE '$(@DirectoryQVD_STG)/$(V_ESQUEMA)_$(V_PREFIJO)'  REPOSITORIO CREADO CORRECTAMENTE;
+	CALL GENERATE_TIMEFILE('TMP_$(V_PREFIJO)');
+
+	
 	
 	CALL GENERATE_TIMEFILE('$(V_PREFIJO)');
 
@@ -795,21 +802,41 @@ SUB CARGA_SAP_ACTUALIZADA(V_ESQUEMA,vTabla,V_PREFIJO,vLlavePK,vPeriodo)
 ENDSUB;
 
 
-SUB STOREQVD(V_NOMBRETABLA,V_NOMBREQVD,V_SWDELETE)
+SUB STOREQVD(V_NOMBRETABLA,V_NOMBREQVD,V_SWDELETE,V_TIPOSTORE)
 
 	IF ISNULL(V_SWDELETE) THEN 
 		V_SWDELETE = @DropQVD; 
 	ENDIF;
 	
-	IF V_NOMBREQVD = '' THEN 
+	IF V_NOMBREQVD = '' or IsNull(V_NOMBREQVD) THEN 
 		V_NOMBREQVD = '$(V_NOMBRETABLA)'; 
 	ENDIF;
 
-	STORE $(V_NOMBRETABLA) INTO 'lib://$(@DirectoryQVD_STG)/$(V_NOMBREQVD).qvd'(qvd);
+	IF V_TIPOSTORE = '' OR ISNULL(V_TIPOSTORE) THEN 
+		V_TIPOSTORE = @TypeStore; 
+	ENDIF;
+	
+
+	IF match(lower(V_TIPOSTORE),'qvd','qvx') then 
+
+		vArchivo = lower(V_TIPOSTORE);
+		if lower(V_TIPOSTORE) = 'qvd' then 
+			STORE $(V_NOMBRETABLA) INTO '$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_NOMBREQVD).$(vArchivo)'(qvd);
+		else
+			STORE $(V_NOMBRETABLA) INTO '$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_NOMBREQVD).$(vArchivo)'(qvx);
+		endif;
+	else
+		vArchivo = lower(V_TIPOSTORE);
+		STORE $(V_NOMBRETABLA) INTO '$(@RaizQlik)$(@DirectoryQVD_STG)/$(V_NOMBREQVD).$(vArchivo)'(txt);
+	ENDIF;
+
+
 	
 	IF V_SWDELETE THEN 
 		drop table $(V_NOMBRETABLA);
 	ENDIF;
+
+
 
 ENDSUB;
 
